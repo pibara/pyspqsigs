@@ -27,8 +27,7 @@ def _deep_bytes_to_b64(obj):
         return rval
     if isinstance(obj, bytes):
         return base64.b64encode(obj).decode()
-    else:
-        print(type(obj))
+    return None
 
 def _deep_b64_to_bytes(obj):
     if isinstance(obj, dict):
@@ -45,8 +44,7 @@ def _deep_b64_to_bytes(obj):
         return rval
     if isinstance(obj, str):
         return base64.b64decode(obj.encode())
-    else:
-        print(type(obj))
+    return None
 
 class _HashFunction:
     def __init__(self, length):
@@ -155,7 +153,7 @@ class SigningKey:
                     for subkey in wotspair:
                         result = subkey
                         for _ in range(0,int(math.pow(2,self.state["wotsbits"]))):
-                            result = self.hashfunction(result, key=self.state["salt"])
+                            result = self.hashfunction(result, self.state["salt"])
                         public_wotspair.append(result)
                     onekey_pub.append(public_wotspair)
                 self.state["pubkey"].append(onekey_pub)
@@ -199,9 +197,9 @@ class SigningKey:
             val1 = private_key[index][0]
             val2 = private_key[index][1]
             for _ in range (0, count1):
-                val1 = self.hashfunction(val1)
+                val1 = self.hashfunction(val1, self.state["salt"])
             for _ in range (0, count2):
-                val2 = self.hashfunction(val2)
+                val2 = self.hashfunction(val2, self.state["salt"])
             signature_body.append([val1,val2])
         # Create the merkletree signature header
         signature_header_mt = list()
@@ -234,7 +232,7 @@ class SigningKey:
         return signature
     def sign_message(self, message):
         """Sign a message"""
-        msg_digest = self.hashfunction(message)
+        msg_digest = self.hashfunction(message, self.state["salt"])
         return self.sign_digest(msg_digest)
     def get_state(self):
         return _deep_bytes_to_b64(self.state)
@@ -250,7 +248,10 @@ class Validator:
         self.merkledepth = merkledepth
     def __call__(self, message, signature):
         """Validate message signature"""
-        msg_digest = self.hashfunction(message)
+        hlenb = int(self.hashfunction.bitcount/8)
+        pubkey = signature[:hlenb]
+        salt = signature[hlenb:2*hlenb]
+        msg_digest = self.hashfunction(message,salt)
         # Convert the digest to a list of integers for signing.
         digest_bits = list(BitArray(bytes=msg_digest).bin)
         bitlists = list()
@@ -266,10 +267,6 @@ class Validator:
                 if bit == "1":
                     num += 1
             numlist.append(num)
-        # Split up the signature into its parts
-        hlenb = int(self.hashfunction.bitcount/8)
-        pubkey = signature[:hlenb]
-        salt = signature[hlenb:2*hlenb]
         sigindex = struct.unpack(">H",signature[2*hlenb:2*hlenb+2])[0]
         sigindex_bits = BitArray("{0:#0{1}x}".format(sigindex,34)).bin[-self.merkledepth:]
         merkle_header = signature[2*hlenb+2:2*hlenb+2+self.merkledepth*hlenb]
@@ -286,9 +283,9 @@ class Validator:
             val1 = signature_body[index][0]
             val2 = signature_body[index][1]
             for _ in range (0, count1):
-                val1 = self.hashfunction(val1)
+                val1 = self.hashfunction(val1, salt)
             for _ in range (0, count2):
-                val2 = self.hashfunction(val2)
+                val2 = self.hashfunction(val2, salt)
             big_pubkey.append([val1, val2])
         # Reduce the wots values to a single hash
         pkey, _ = _pubkey_to_merkletree(_flatten_pubkey(big_pubkey), self.hashfunction, salt)
