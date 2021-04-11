@@ -11,6 +11,7 @@ import struct
 import base64
 from hashlib import blake2b
 from bitstring import BitArray
+import concurrent.futures
 
 def _deep_bytes_to_b64(obj):
     if isinstance(obj, dict):
@@ -100,10 +101,21 @@ def _reconstruct_merkle_root(hashfunction, nodes, bitindex, reduced_pseudo_pubke
             res = hashfunction(nodes[index] + res, salt)
     return res
 
+def _onekey(onekey, hashfunction, wotsbits, salt):
+    onekey_pub = list()
+    for wotspair in onekey:
+        public_wotspair = list()
+        for subkey in wotspair:
+            result = subkey
+            for _ in range(0,int(math.pow(2, wotsbits))):
+                result = hashfunction(result, salt)
+            public_wotspair.append(result)
+        onekey_pub.append(public_wotspair)
+    return onekey_pub
 
 class SigningKey:
     """Class representing a hash based signing key"""
-    def __init__(self, wotsbits=12, merkledepth=10, hashlen=24, restore=None):
+    def __init__(self, wotsbits=12, merkledepth=10, hashlen=24, restore=None, multiproc=0):
         """Constructor should either be called in one of three ways:
         * Without any arguments. A new key is generated using the default settings.
         * With values set for wotsbits, merkledepth and hashlen. A new key is generated with
@@ -146,17 +158,19 @@ class SigningKey:
         # generate the big pubkey from private key (if not restorable)
         if self.state["pubkey"] is None:
             self.state["pubkey"] = list()
-            for onekey in self.private_key:
-                onekey_pub = list()
-                for wotspair in onekey:
-                    public_wotspair = list()
-                    for subkey in wotspair:
-                        result = subkey
-                        for _ in range(0,int(math.pow(2,self.state["wotsbits"]))):
-                            result = self.hashfunction(result, self.state["salt"])
-                        public_wotspair.append(result)
-                    onekey_pub.append(public_wotspair)
-                self.state["pubkey"].append(onekey_pub)
+            if multiproc > 1:
+                with concurrent.futures.ProcessPoolExecutor(max_workers = multiproc) as executor:
+                    future_to_res = {executor.submit(_onekey, onekey, self.hashfunction, self.state["wotsbits"], self.state["salt"]): onekey for onekey in self.private_key}
+                    for future in concurrent.futures.as_completed(future_to_res):
+                        res = future_to_res[future]
+                        data = future.result()
+                        self.state["pubkey"].append(data)
+            else:
+                for onekey in self.private_key:
+                    self.state["pubkey"].append(_onekey(onekey, 
+                                                        self.hashfunction,
+                                                        self.state["wotsbits"],
+                                                        self.state["salt"]))
         # reduce the public key size
         medium_public_key = list()
         for big_pubkey in self.state["pubkey"]:
