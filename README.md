@@ -21,4 +21,5 @@ Some aditions:
 * Currently the introduction of salting has broken the code. Will look into this soon.
 * The linters are not yet happy with the code, will fix this once signing and validation match up again
 * There is a lot of room for paralelization in new key generation. Need to look into this before declaring lib production ready.
+* Need to add a setup.py, and need to push to pypi once stuf works and is stable.
 * We should get a second pair of eyes to look at the code.
