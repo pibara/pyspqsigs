@@ -10,6 +10,9 @@ Check out the following two blog posts for a basic idea of what this library aim
 
 The code in this library is based mostly on the sample code from the blog posts.
 
+![image](https://user-images.githubusercontent.com/289546/114308898-ab79b300-9ae5-11eb-99bb-c4603b1a07f3.png)
+
+
 Some aditions:
 
 * Use of a per private key salt used in most hashing operations
