@@ -99,4 +99,14 @@ ok, pubkey, index = validate(message, signature)
 
 It is adviced to not accept the same index from the same public key twice.
 
+## Signature format:
 
+A spqsigs signature has the following structure:
+
+* public key: haslen bytes
+* salt : hashlen bytes
+* index : 2 bytes
+* merkle tree header: merkledepth minus one times hashlen
+* wots body: two times hashlen times the ceiling of hashlen divided by wotsbits
+
+Please note that spqsigs signatures are considerably larger than what you might be used to when using ECDSA signatures. 
