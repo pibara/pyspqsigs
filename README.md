@@ -22,5 +22,81 @@ Some aditions:
 
 ## status
 
-* Need to add a setup.py, and need to push to pypi once stuf works and is stable.
 * We should get a second pair of eyes to look at the code.
+
+## install
+
+You can install (the currently experimental version of) spqsigs using the following command:
+
+```
+python3 -m pip install spqsigs
+```
+
+## usage
+
+### signing
+
+To use the signing part of spqsigs, import the SigningKey class and instantiate it.
+The constructor allows you to specify:
+
+* hashlen: The number of bytes to use as digest length dor BLAKE2b. This defaults to 24 bytes.
+* wotsbits: The number of bits to sign with one set of WOTS chains. Note that each bit makes signing key generation a factor of two slower. This value defaults to 12 bit.
+* merkledepth: The depth (or height) of the top level merkle tree. You can sign two to the power depth messages with a single signing key before it depletes. Adding one level to the depth doubles both the number of messages you can sign with a single key and the amount of time to generate a signing key.
+* multiproc: The number of rocesses to use during signing key generation. This defaults to 8.
+            
+```python
+from spqsigs import SigningKey
+
+sigkey = SigningKey(hashlen=24, wotsbits=12, merkledepth=10, multiproc=4)
+```
+
+Once the signing key is constructed, you can use it to sign messages with untill the key depletes.
+
+```python
+message = b"This is a message"
+signature = sigkey.sign_message(message)
+```
+
+### state
+
+It is important to realizer that hash-based signing keys are statefull. After creation, but also after each signature made, the state of the signing key should be saved to persistent storage. 
+
+While important, the spqsigs library has no support for encrypting this storage with a passphrase. You should implement something for that yourself when using this library.
+
+The below serialization to unencrypted JSON is usefull for experiments: 
+
+```python
+import json
+
+with open("signkey_state.json", "w") as outfil:
+    json.dump(sigkey.get_state(), outfile)
+```
+
+We can restore the signing key by using the restore constructor argument.
+```python
+with open("signkey_state.json") as infil:
+    oldstate = json.load(infil)
+sigkey = SigningKey(restore=oldstate)
+````
+
+### validation
+
+For validating signatures, we impor tand instantiate the validator Class.
+Make sure to use the exact same parameters for hashlen, wotsbits and merkledepth as used for the 
+construction of the SigningKey object.
+
+```python
+from spqsigs import Validator
+
+validate = Validator(hashlen=24, wotsbits=12, merkledepth=10)
+```
+
+Now we can invoke the validator with the message and the signature. This invocation returns three values. If validation was succesfull or not, the pubkey of the signer, and the index of the signature.
+
+```python
+ok, pubkey, index = validate(message, signature)
+```
+
+It is adviced to not accept the same index from the same public key twice.
+
+
