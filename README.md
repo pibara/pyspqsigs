@@ -22,6 +22,5 @@ Some aditions:
 
 ## status
 
-* The linters are not yet happy with the code, will fix this once signing and validation match up again
 * Need to add a setup.py, and need to push to pypi once stuf works and is stable.
 * We should get a second pair of eyes to look at the code.
