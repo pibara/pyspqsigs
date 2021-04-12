@@ -101,7 +101,7 @@ def _reconstruct_merkle_root(hashfunction, nodes, bitindex, reduced_pseudo_pubke
             res = hashfunction(nodes[index] + res, salt)
     return res
 
-def _onekey(onekey, hashfunction, wotsbits, salt):
+def _onekey(onekey, hashfunction, wotsbits, salt, ndx):
     onekey_pub = list()
     for wotspair in onekey:
         public_wotspair = list()
@@ -111,11 +111,11 @@ def _onekey(onekey, hashfunction, wotsbits, salt):
                 result = hashfunction(result, salt)
             public_wotspair.append(result)
         onekey_pub.append(public_wotspair)
-    return onekey_pub
+    return [onekey_pub, ndx]
 
 class SigningKey:
     """Class representing a hash based signing key"""
-    def __init__(self, wotsbits=12, merkledepth=10, hashlen=24, restore=None, multiproc=0):
+    def __init__(self, wotsbits=12, merkledepth=10, hashlen=24, restore=None, multiproc=8):
         """Constructor should either be called in one of three ways:
         * Without any arguments. A new key is generated using the default settings.
         * With values set for wotsbits, merkledepth and hashlen. A new key is generated with
@@ -157,15 +157,17 @@ class SigningKey:
             self.private_key.append(onekey)
         # generate the big pubkey from private key (if not restorable)
         if self.state["pubkey"] is None:
-            self.state["pubkey"] = list()
             if multiproc > 1:
+                r01 = len(self.private_key)
+                self.state["pubkey"] = [None] * r01
                 with concurrent.futures.ProcessPoolExecutor(max_workers = multiproc) as executor:
-                    future_to_res = {executor.submit(_onekey, onekey, self.hashfunction, self.state["wotsbits"], self.state["salt"]): onekey for onekey in self.private_key}
+                    future_to_res = {executor.submit(_onekey, self.private_key[ndx], self.hashfunction, self.state["wotsbits"], self.state["salt"], ndx): ndx for ndx in range(0,r01)}
                     for future in concurrent.futures.as_completed(future_to_res):
                         res = future_to_res[future]
                         data = future.result()
-                        self.state["pubkey"].append(data)
+                        self.state["pubkey"][data[1]] = data[0]
             else:
+                self.state["pubkey"] = list()
                 for onekey in self.private_key:
                     self.state["pubkey"].append(_onekey(onekey, 
                                                         self.hashfunction,

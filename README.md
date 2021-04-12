@@ -18,10 +18,10 @@ Some aditions:
 * Use of a per private key salt used in most hashing operations
 * Standirisation on the use of BLAKE2
 * State serialization and deserialization into a JSON compatible structure.
+* Use of multiprocessing for faster signing key generation
 
 ## status
 
-* Multiprocessing for key creation not yet working. Needed for speeding up slow key creation.
 * The linters are not yet happy with the code, will fix this once signing and validation match up again
 * Need to add a setup.py, and need to push to pypi once stuf works and is stable.
 * We should get a second pair of eyes to look at the code.
