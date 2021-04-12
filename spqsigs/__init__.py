@@ -130,12 +130,12 @@ def _key_from_seed(state, key_count, subkeys_per_key, hashfunction):
         rval.append(onekey)
     return rval
 
-def _digest_to_numlist(digest, state):
+def _digest_to_numlist(digest, wotsbits):
     digest_bits = list(BitArray(bytes=digest).bin)
     bitlists = list()
-    while len(digest_bits) > state["wotsbits"]:
-        bitlists.append(digest_bits[:state["wotsbits"]])
-        digest_bits = digest_bits[state["wotsbits"]:]
+    while len(digest_bits) > wotsbits:
+        bitlists.append(digest_bits[:wotsbits])
+        digest_bits = digest_bits[wotsbits:]
     bitlists.append(digest_bits)
     numlist = list()
     for bits in bitlists:
@@ -247,7 +247,7 @@ class SigningKey:
         # Get the current private key
         private_key = self.private_key[self.state["next"]]
         # Convert the digest to a list of integers for signing.
-        numlist = _digest_to_numlist(digest, self.state)
+        numlist = _digest_to_numlist(digest, self.state["wotsbits"])
         # Create the signature body
         signature_body = _create_signature_body(numlist, self.state, private_key,
                                                 self.hashfunction)
@@ -295,20 +295,7 @@ class Validator:
         salt = signature[hlenb:2*hlenb]
         msg_digest = self.hashfunction(message,salt)
         # Convert the digest to a list of integers for signing.
-        digest_bits = list(BitArray(bytes=msg_digest).bin)
-        bitlists = list()
-        while len(digest_bits) > self.wotsbits:
-            bitlists.append(digest_bits[:self.wotsbits])
-            digest_bits = digest_bits[self.wotsbits:]
-        bitlists.append(digest_bits)
-        numlist = list()
-        for bits in bitlists:
-            num = 0
-            for bit in bits:
-                num *= 2
-                if bit == "1":
-                    num += 1
-            numlist.append(num)
+        numlist = _digest_to_numlist(msg_digest, self.wotsbits)
         sigindex = struct.unpack(">H",signature[2*hlenb:2*hlenb+2])[0]
         sigindex_bits = BitArray("{0:#0{1}x}".format(sigindex,34)).bin[-self.merkledepth:]
         merkle_header = signature[2*hlenb+2:2*hlenb+2+self.merkledepth*hlenb]
