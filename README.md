@@ -103,10 +103,14 @@ It is adviced to not accept the same index from the same public key twice.
 
 A spqsigs signature has the following structure:
 
-* public key: haslen bytes
-* salt : hashlen bytes
-* index : 2 bytes
-* merkle tree header: merkledepth minus one times hashlen
-* wots body: two times hashlen times the ceiling of hashlen divided by wotsbits
+* public key: haslen bytes (the green dot in the diagram)
+* salt : hashlen bytes (see below)
+* index : 2 bytes (the grey-dot number two in the diagram)
+* merkle tree header: merkledepth minus one times hashlen (the red dots in the diagram)
+* wots body: two times hashlen times the ceiling of hashlen divided by wotsbits (the orange dots in the diagram)
 
 Please note that spqsigs signatures are considerably larger than what you might be used to when using ECDSA signatures. 
+
+## What's up with the salt?
+
+In order to prevent rainbow table like attacks where an attacker could try to basically mine seeds, we added a salt to the entire collection of trees and chains. Doing so means that each public key would need to be targeted individually, and no rainbow table work could be done. The salt is a random number with the same length as the digest length primitive used in BLAKE2b operations, and is bound to a spqsigs keypair for the lifetime of the key.
