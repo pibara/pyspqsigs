@@ -3,6 +3,10 @@ Python Simple (Hash Based) Post Quantum Signatures
 
 This library is currently a work in progress. It is meant to become part of a collection of libraries for aiding the HIVE blockchain ecosystem towards a post-quantum future.
 
+* **Python** (this library)
+* [C++](https://github.com/pibara/spq-sigs) (comming soon)
+* **JavaScript** (no work planned on JavaScript yet)
+
 Check out the following two blog posts for a basic idea of what this library aims to implement.
 
 * [part 1](https://hive.blog/hive-161707/@pibara/a-practical-introduction-into-hash-based-signatures-using-python-part-one)
