@@ -76,25 +76,37 @@ def _flatten_pubkey(key):
     return rval
 
 
-def _pubkey_to_merkletree(key, hashfunction, salt, prefix=""):
-    drval = dict()
+def _pubkey_to_merkletree(key, hashfunction, salt, prefix="", mtdict=False):
+    if mtdict:
+        drval = dict()
     part1 = key[0]
     part2 = key[1]
     if len(key) > 2:
         breakpoint = int(len(key)/2)
-        part1, dpart1 = _pubkey_to_merkletree(key[:breakpoint], hashfunction, salt, prefix + "0")
-        part2, dpart2 = _pubkey_to_merkletree(key[breakpoint:], hashfunction, salt, prefix + "1")
-        for key2 in dpart1:
-            drval[key2] = dpart1[key2]
-        for key3 in dpart2:
-            drval[key3] = dpart2[key3]
+        if mtdict:
+            part1, dpart1 = _pubkey_to_merkletree(key[:breakpoint], hashfunction, salt, 
+                                                  prefix + "0", mtdict)
+            part2, dpart2 = _pubkey_to_merkletree(key[breakpoint:], hashfunction, salt, 
+                                                  prefix + "1", mtdict)
+            for key2 in dpart1:
+                drval[key2] = dpart1[key2]
+            for key3 in dpart2:
+                drval[key3] = dpart2[key3]
+        else:
+            part1 = _pubkey_to_merkletree(key[:breakpoint], hashfunction, salt, 
+                                          prefix + "0", mtdict)
+            part2 = _pubkey_to_merkletree(key[breakpoint:], hashfunction, salt, 
+                                          prefix + "1", mtdict)
     rval = hashfunction(part1 + part2, salt)
-    if prefix:
-        drval[prefix] = rval
-        if len(key) == 2:
-            drval[prefix + "0"] = part1
-            drval[prefix + "1"] = part2
-    return rval, drval
+    if mtdict:
+        if prefix:
+            drval[prefix] = rval
+            if len(key) == 2:
+                drval[prefix + "0"] = part1
+                drval[prefix + "1"] = part2
+        return rval, drval
+    else:
+        return rval
 
 
 def _reconstruct_merkle_root(hashfunction, nodes, bitindex, reduced_pseudo_pubkey, salt):
@@ -202,6 +214,122 @@ def _complete_wots_chain(numlist, wotsbits, signature_body, salt, hashfunction):
         big_pubkey.append([val1, val2])
     return big_pubkey
 
+class SubKey:
+    def __init__(self, seed, salt, index, subindex, wotsbits, hashfunction):
+        self.salt = salt
+        self.wotsbits = wotsbits
+        self.chainlen = int(math.pow(2, wotsbits))
+        self.hashfunction = hashfunction
+        self.privkeys = list()
+        self.pubkey = None
+        for direction in [b"L", b"R"]:
+            designator = str(index).encode() + direction + str(subindex).encode()
+            unsalted = hashfunction(designator, seed)
+            self.privkeys.append(hashfunction(unsalted,salt))
+
+    def pubkey(self):
+        if self.pubkey is None:
+            pubkeys = list()
+            for subkey in self.privatekeys:
+                result = subkey
+                for _ in range(0, self.chainlen):
+                    result = hashfunction(result, self.salt)
+                pubkeys.append(result)
+            self.pubkey = hashfunction(pubkeys[0] + pubkeys[1], self.salt) 
+        return self.pubkey
+
+    def __getitem__(self, index):
+        count1 = index
+        count2 = self.chainlen - count1 - 1
+        val1 = self.privkeys[0]
+        val2 = self.privkeys[1]
+        for _ in range(0, count1):
+            val1 = hashfunction(val1, self.salt)
+        for _ in range(0, count2):
+            val2 = hashfunction(val2, self.salt)
+        return val1 + val2
+
+def mt_reduce(self, keys, hashfunction, salt):
+    count = len(keys)
+    if count > 2:
+        half = int(count/2)
+        return mt_reduce(mt_reduce(keys[:half]), mt_reduce(keys[half:]))
+    else:
+        return hashfunction(keys[0] + keys[1], salt)
+       
+
+def digest_to_numlist(digest, wotsbits):
+    digest_bits = list(BitArray(bytes=digest).bin)
+    bitlists = list()
+    while len(digest_bits) > wotsbits:
+        bitlists.append(digest_bits[:wotsbits])
+        digest_bits = digest_bits[wotsbits:]
+    bitlists.append(digest_bits)
+    numlist = list()
+    for bits in bitlists:
+        num = 0
+        for bit in bits:
+            num *= 2
+            if bit == "1":
+                num += 1
+        numlist.append(num)
+    return numlist
+
+class PrivateKey:
+    def __init__(self, seed, salt, index, subkeys, wotsbits, hashfunction):
+        self.salt = salt
+        self.hashfunction = hashfunction
+        self.wotsbits = wotsbits
+        self.subkeys = dict()
+        for subindex in range(0, subkeys):
+            self.subkeys[subindex] = SubKey(seed, salt, index, subindex, wotsbits, hashfunction)
+    
+    def pubkey(self):
+        pubkeys = list()
+        for subkey in self.subkeys:
+            pubkeys.append(self.subkeys.pubkey())
+        return mt_reduce(pubkeys, self.hashfunction, self.salt)
+
+    def  __getitem__(self, msg_digest):
+        numlist = digest_to_numlist(msg_digest, self.wotsbits)
+        rval = b""
+        for index in range(0, len(numlist)):
+            rval += self.subkeys[index][numlist[index]]
+
+
+class PrivateKeys:
+    def __init__(self, seed, salt, size, wotsbits, hashfunction):
+        self.seed = seed
+        self.salt = salt
+        self.size = size
+        self.wotsbits = wotsbits
+        self.hashfunction = hashfunction
+        self.keys = dict()
+        self.pub_keys = None
+        self.subkey_count =  math.ceil(hashfunction.bitcount/wotsbits)
+
+    def __getitem__(self, index):
+        if isinstance(index, int):
+            if index < 0 or index >= self.size:
+                raise IndexError("Index out of range")
+            if index not in self.keys:
+                self.keys[index] = PrivateKey(self.seed, self.salt, 
+                                              index,
+                                              self.subkey_count,
+                                              self.wotsbits,
+                                              self.hashfunction)
+        else:
+            raise RuntimeError("Index should be an integer")
+
+    def pubkey(self):
+        rval = list()
+        for index in range(0, self.size):
+            rval.append(self[index].pubkey())
+        return rval
+
+class MerkleTree:
+    def __init__(self, pubkey, hashfunction, salt):
+        pass
 
 class SigningKey:
     """Class representing a hash based signing key"""
@@ -223,6 +351,7 @@ class SigningKey:
             self.state["next"] = 0
             self.state["seed"] = None
             self.state["salt"] = None
+            self.state["merkletree"] = None
             self.state["pubkey"] = None
         self.hashfunction = _HashFunction(self.state["hashlen"])
         if self.state["seed"] is None:
@@ -261,13 +390,14 @@ class SigningKey:
         # reduce the public key size
         medium_public_key = list()
         for big_pubkey in self.state["pubkey"]:
-            pkey, _ = _pubkey_to_merkletree(_flatten_pubkey(big_pubkey), self.hashfunction,
+            pkey = _pubkey_to_merkletree(_flatten_pubkey(big_pubkey), self.hashfunction,
                                             self.state["salt"])
             medium_public_key.append(pkey)
         # Turn remaining pubkey into a merkle tree and root
-        self.public_key, self.merkletree = _pubkey_to_merkletree(medium_public_key,
+        self.public_key, self.state["merkletree"] = _pubkey_to_merkletree(medium_public_key,
                                                                  self.hashfunction,
-                                                                 self.state["salt"])
+                                                                 self.state["salt"],
+                                                                 mtdict=True)
 
     def sign_digest(self, digest):
         """Sign a message digest."""
@@ -281,7 +411,8 @@ class SigningKey:
         signature_body = _create_signature_body(numlist, self.state, private_key,
                                                 self.hashfunction)
         # Create the merkletree signature header
-        signature_header_mt = _create_signature_merkletree_header(self.state, self.merkletree)
+        signature_header_mt = _create_signature_merkletree_header(self.state,
+                                                                  self.state["merkletree"])
         # encode the key index
         bindex = struct.pack(">H", self.state["next"])
         # Compose the signature from:
@@ -338,7 +469,7 @@ class Validator:
         big_pubkey = _complete_wots_chain(numlist, self.wotsbits, signature_body, salt,
                                           self.hashfunction)
         # Reduce the wots values to a single hash
-        pkey, _ = _pubkey_to_merkletree(_flatten_pubkey(big_pubkey), self.hashfunction, salt)
+        pkey = _pubkey_to_merkletree(_flatten_pubkey(big_pubkey), self.hashfunction, salt)
         # Check the single hash with the merkle tree header.
         mt_root_candidate = _reconstruct_merkle_root(
             self.hashfunction,
