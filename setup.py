@@ -6,7 +6,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(
     name='spqsigs',
-    version='0.1.1',
+    version='0.1.2',
     description='Simple Post-Quantum Signature library',
     long_description="""Library for hash-based signatures using BLAKE2, salt,
     double WOTS chains, and Merkle-trees.
