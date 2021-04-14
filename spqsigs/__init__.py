@@ -2,8 +2,6 @@
 
 This module provides simple BLAKE2 hash-based based signature using a simple
 design made out of a combination of a merkle tree and dual WOTS chains.
-
-
 """
 import math
 import os
@@ -196,6 +194,7 @@ class PrivateKeys:
         """Helper method for making multi process code easyer"""
         obj = self[index]
         rval = obj.pubkey()
+        print(index, rval.hex().upper())
         return rval, index
 
     def pubkey(self):
@@ -290,8 +289,8 @@ class SigningKey:
         if restore:
             if "wotsbits" in restore:
                 self.wotsbits = restore["wotsbits"]
-            if "merkledept" in restore:
-                self.erkledepth = restore["merkledepth"]
+            if "merkledepth" in restore:
+                self.merkledepth = restore["merkledepth"]
             if "hashlen" in restore:
                 self.hashlen = restore["hashlen"]
             if "next_index" in restore:
@@ -302,7 +301,8 @@ class SigningKey:
                 self.seed = base64.b64decode(restore["salt"].encode())
             if "merkletree" in restore:
                 mtrestore = restore["merkletree"]
-        self.hashfunction = HashFunction(hashlen)
+        print("hashlen:", self.hashlen)
+        self.hashfunction = HashFunction(self.hashlen)
         if self.seed is None:
             self.seed = self.hashfunction.generate_seed()
         if self.salt is None:
@@ -322,8 +322,13 @@ class SigningKey:
 
     def sign_digest(self, digest):
         """Sign a message digest"""
+        print("index", self.next_index)
         bindex = struct.pack(">H", self.next_index)
-        rval = self.merkletree.pubkey() + self.salt + bindex + self.merkletree[self.next_index]
+        rval = self.merkletree.pubkey()
+        rval += self.salt
+        print(len(self.salt))
+        rval += bindex
+        rval += self.merkletree[self.next_index]
         rval += self.private_keys[self.next_index][digest]
         self.next_index += 1
         return rval
@@ -341,7 +346,7 @@ class SigningKey:
         rval["next_index"] = self.next_index
         rval["wotsbits"] = self.wotsbits
         rval["merkledepth"] = self.merkledepth
-        rval["hashlength"] = self.hashlen
+        rval["hashlen"] = self.hashlen
         rval["merkletree"] = self.merkletree.get_state()
         return rval
 
@@ -372,6 +377,7 @@ class Validator:
         # Complete the double WOTS chain.
         pkey = wots_chain_to_signing_pubkey(numlist, self.wotsbits, signature_body, salt,
                                             self.hashfunction)
+        print(pkey.hex().upper())
         # Check the single hash with the merkle tree header.
         mt_root_candidate = reconstruct_merkle_root(
             self.hashfunction,
