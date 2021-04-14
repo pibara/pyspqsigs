@@ -298,12 +298,13 @@ class PrivateKey:
 
 
 class PrivateKeys:
-    def __init__(self, seed, salt, size, wotsbits, hashfunction):
+    def __init__(self, seed, salt, size, wotsbits, hashfunction, multiproc):
         self.seed = seed
         self.salt = salt
         self.size = size
         self.wotsbits = wotsbits
         self.hashfunction = hashfunction
+        self.multiproc = multiproc
         self.keys = dict()
         self.pub_keys = None
         self.subkey_count =  math.ceil(hashfunction.bitcount/wotsbits)
@@ -318,18 +319,88 @@ class PrivateKeys:
                                               self.subkey_count,
                                               self.wotsbits,
                                               self.hashfunction)
+            return self.keys[index]
         else:
             raise RuntimeError("Index should be an integer")
 
     def pubkey(self):
-        rval = list()
-        for index in range(0, self.size):
-            rval.append(self[index].pubkey())
+        rval = [None] * self.size
+        with concurrent.futures.ProcessPoolExecutor(max_workers=self.multiproc) as executor:
+            future_to_res = {executor.submit(self[ndx].pubkey,
+                                             with_index=True): ndx for ndx in range(0, self.size)}
+            for onekey in concurrent.futures.as_completed(future_to_res):
+                data = onekey.result()
+                rval[data[1]] - data[0]
         return rval
 
+
+def pubkey_to_merkletree(key, hashfunction, salt, prefix=""):
+    drval = dict()
+    part1 = key[0]
+    part2 = key[1]
+    if len(key) > 2:
+        breakpoint = int(len(key)/2)
+        part1, dpart1 = _pubkey_to_merkletree(key[:breakpoint], hashfunction, salt,
+                                              prefix + "0")
+        part2, dpart2 = _pubkey_to_merkletree(key[breakpoint:], hashfunction, salt,
+                                              prefix + "1")
+        for key2 in dpart1:
+            drval[key2] = dpart1[key2]
+        for key3 in dpart2:
+            drval[key3] = dpart2[key3]
+    rval = hashfunction(part1 + part2, salt)
+    drval[prefix] = rval
+    if len(key) == 2:
+        drval[prefix + "0"] = part1
+        drval[prefix + "1"] = part2
+    return rval
+
+
 class MerkleTree:
-    def __init__(self, pubkey, hashfunction, salt):
-        pass
+    def __init__(self, privkey, hashfunction, salt, mtdepth):
+        self.mtdepth = mtdepth
+        self.mttree_lookup = pubkey_to_merkletree(privkey.pubkey(),
+                                                  hashfunction,
+                                                  salt)
+    def pubkey(self):
+        return self.mttree_lookup[""]
+
+    def __getitem__(self, index):
+        rval = b""
+        index_bits = BitArray("{0:#0{1}x}".format(index, 34)).bin[-self.mtdepth:]
+        for bindex in range(0, self.mtdepth):
+
+            prefix = index_bits[0:bindex]
+            thisbit = index_bits[bindex]
+            if thisbit == "1":
+                rval += self.mtree_lookup[prefix + "0"]
+            else:
+                rval += self.mtree_lookup[prefix + "1"]
+        return rval
+
+class SigningKey2:
+    def __init(self, wotsbits=12, merkledepth=10, hashlen=24, restore=None, multiproc=8):
+        if restore:
+            raise RuntimeError("Not yet implemented")
+        hashfunction = _HashFunction(hashlen)
+        seed = self.hashfunction.generate_seed()
+        self.salt = self.hashfunction.generate_salt()
+        size = int(math.pow(2, self.state["merkledepth"])) 
+        self.private_keys = PrivateKeys(seed, self.salt, size, wotsbits, hashfunction)
+        self.merkletree = MerkleTree(self.private_key, hashfunction, salt, merkledepth)
+        self.next_index = 0
+
+    def sign_digest(self, digest):
+        bindex = struct.pack(">H", self.next_index)
+        rval = self.merkletree.pubkey() + self.salt + bindex + self.merkletree[self.next_index]
+        rval += self.private_keys[self.next_index][digest]
+        self.next_index +=1
+        return rval
+
+    def sign_message(self, message):
+        """Sign a message"""
+        msg_digest = self.hashfunction(message, self.state["salt"])
+        return self.sign_digest(msg_digest)
 
 class SigningKey:
     """Class representing a hash based signing key"""
