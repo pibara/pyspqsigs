@@ -2,7 +2,8 @@
 import json
 import time
 import base64
-from spqsigs import SigningKey, Validator
+from spqsigs import SigningKey
+from spqsigs import Validator
 
 
 print("Creating a new signing key. This may take a while.")
