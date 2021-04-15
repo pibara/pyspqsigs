@@ -26,7 +26,6 @@ Some aditions:
 
 ## status
 
-* Saving and restoring the key state is currently broken.
 * We should get a second pair of eyes to look at the code.
 
 ## install

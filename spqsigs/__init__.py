@@ -194,7 +194,6 @@ class PrivateKeys:
         """Helper method for making multi process code easyer"""
         obj = self[index]
         rval = obj.pubkey()
-        print(index, rval.hex().upper())
         return rval, index
 
     def pubkey(self):
@@ -298,10 +297,9 @@ class SigningKey:
             if "seed" in restore:
                 self.seed = base64.b64decode(restore["seed"].encode())
             if "salt" in restore:
-                self.seed = base64.b64decode(restore["salt"].encode())
+                self.salt = base64.b64decode(restore["salt"].encode())
             if "merkletree" in restore:
                 mtrestore = restore["merkletree"]
-        print("hashlen:", self.hashlen)
         self.hashfunction = HashFunction(self.hashlen)
         if self.seed is None:
             self.seed = self.hashfunction.generate_seed()
@@ -322,14 +320,12 @@ class SigningKey:
 
     def sign_digest(self, digest):
         """Sign a message digest"""
-        print("index", self.next_index)
         bindex = struct.pack(">H", self.next_index)
-        rval = self.merkletree.pubkey()
-        rval += self.salt
-        print(len(self.salt))
-        rval += bindex
-        rval += self.merkletree[self.next_index]
-        rval += self.private_keys[self.next_index][digest]
+        rval = (self.merkletree.pubkey() +
+                self.salt +
+                bindex +
+                self.merkletree[self.next_index] +
+                self.private_keys[self.next_index][digest])
         self.next_index += 1
         return rval
 
@@ -377,7 +373,6 @@ class Validator:
         # Complete the double WOTS chain.
         pkey = wots_chain_to_signing_pubkey(numlist, self.wotsbits, signature_body, salt,
                                             self.hashfunction)
-        print(pkey.hex().upper())
         # Check the single hash with the merkle tree header.
         mt_root_candidate = reconstruct_merkle_root(
             self.hashfunction,

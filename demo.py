@@ -20,7 +20,7 @@ for _ in range(0,5):
     duration = time.time() - start
     print("Signing took", duration, "seconds")
     ok, pubkey, index = validate(message, signature)
-    print(ok, pubkey.hex().upper(), index)
+    print(ok, pubkey.hex().upper(), index, len(signature))
 print()
 print("Restoring key from old state, this should go faster")
 start = time.time()
@@ -33,9 +33,12 @@ print()
 for _ in range(0,5):
     start = time.time()
     signature = sigkey2.sign_message(message)
+    signature2 = sigkey.sign_message(message)
     duration = time.time() - start
     print("Signing took", duration, "seconds")
     ok, pubkey, index = validate(message, signature)
-    print(ok, pubkey.hex().upper(), index)
+    print(ok, pubkey.hex().upper(), index, signature.hex().upper())
+    ok, pubkey, index = validate(message, signature2)
+    print(ok, pubkey.hex().upper(), index, signature2.hex().upper())
 
 
