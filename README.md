@@ -1,18 +1,26 @@
 # pyspqsigs
 Python Simple (Hash Based) Post Quantum Signatures
 
-This library is currently a work in progress. It is meant to become part of a collection of libraries for aiding the HIVE blockchain ecosystem towards a post-quantum future.
+This library is currently in Proof-Of-Concept status. It is currently being reimplemented and refactored into a more extensive C++ version of this library that will later get backported to this Python library again. The aim is to eventualy make a version in many languages, implementing multi-tree hash-based signatures, and a simple wallet for password protected keys and signing state. 
 
-* **Python** (this library)
-* [C++](https://github.com/pibara/spq-sigs) (comming soon)
-* **JavaScript** (no work planned on JavaScript yet)
+* **Python** (this library, currently Proof-Of-Concept)
+* [C++](https://github.com/pibara/spq-sigs) (Redesign of this library in C++ with extra features)
 
-Check out the following two blog posts for a basic idea of what this library aims to implement.
+When these two libraries are done and made 100% compatible, the following languages are candidates to implement next in order of my current personal preference:
+
+* **Rust** : Given that the full design is now being done in C++, folowed by Python, Rust is technologically the most obvious choiche for a next port.
+* **JavaScript** : This project started meant for HIVE. While it is no longer a HIVE exclusive project, HIVE, as a blockchain that reuses signing key by design remains one of the chains most in need of hash based signatures for its entire ecosystem. Without JavaSript right now, it won't be a match. So after Rust, I'll work on the JavsScript port.
+* **Clojure** : I've been using the amazing block-chain based database FlureeDB at work for a while now. Like HIVE, FlureeDB relies on ECDSA key-reusage by design. My clojure and lisp skills are pretty minimal right now, but I feel that porting to Clojure could be an amazing learning experience for me in that. If I succeed, maybe the Clojure port could one day be used from a FlureeDB fork.  
+* **Elixir** : Elixir is just an amazing language that I've played around with a bit, but that I haven't done as much with as I would have liked to. So basically this port will be an excuse for me to work with Elixir a bit more, and an excuse to delay working on the Ruby and PhP ports.
+* **Ruby** : I really don't like Ruby, but it is part of the HIVE eco system, so it is here on the list. I hope by the time I am finished with all of the languages above, my project will have gained enough traction for someone else to have picked up the Ruby port. If not, I'll be working on it after Elixir.
+* **PHP** : Like Ruby, I'm no fan of PHP. Everything I just said about Rube goes for PHP as well. Its part of the HIVE ecosystem, so someone will need to do the port. Hope it won't have to be me.
+
+Check out the following two blog posts for a basic idea of what this library aims to implement. Note thet in the C++ code, changes, mostly simplifications, have been made to the design not mentioned in these posts.
 
 * [part 1](https://hive.blog/hive-161707/@pibara/a-practical-introduction-into-hash-based-signatures-using-python-part-one)
 * [part 2](https://hive.blog/hive-161707/@pibara/a-practical-introduction-into-hash-based-signatures-using-python-part-two)
 
-The code in this library is based mostly on the sample code from the blog posts.
+The code in the P.O.C version of this  library is based mostly on the sample code from the blog posts.
 
 ![image](https://user-images.githubusercontent.com/289546/114308898-ab79b300-9ae5-11eb-99bb-c4603b1a07f3.png)
 
