@@ -1,3 +1,7 @@
+# Note: Big refactoring pending
+
+The pyspqsigs project is currently undergoing a bit refactoring into what has been renamed to [coinZdense](https://coin.z-den.se/). Check out the [technical deep-dive](https://hive.blog/coinzdense/@pibara/coinzdense-deep-dive-index) documents to see what's comming. The The part of the project is currently being continued with a fresh code-base [here](https://github.com/pibara/coinzdense-python).
+
 # pyspqsigs
 Python Simple (Hash Based) Post Quantum Signatures
 
